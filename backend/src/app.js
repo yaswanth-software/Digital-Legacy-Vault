@@ -33,6 +33,14 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ===== Health Check =====
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'LegacyOS API is running',
+    health: '/api/health',
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
