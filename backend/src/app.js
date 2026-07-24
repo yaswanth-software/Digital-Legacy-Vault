@@ -26,7 +26,10 @@ const app = express();
 // ===== Security Middleware =====
 app.use(securityHeaders);
 app.use(cors({
-  origin: env.clientUrl,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like curl, postman) or any origin in dev
+    callback(null, true);
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
