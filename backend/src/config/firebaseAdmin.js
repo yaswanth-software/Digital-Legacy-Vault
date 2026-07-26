@@ -46,7 +46,26 @@ function initializeFirebaseAdmin() {
       }
     }
 
-    // Option 2: Individual environment variables
+    // Option 2: JSON string or Base64 in FIREBASE_SERVICE_ACCOUNT_JSON env var
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+      try {
+        const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON.trim();
+        const jsonString = rawJson.startsWith('{')
+          ? rawJson
+          : Buffer.from(rawJson, 'base64').toString('utf8');
+        const serviceAccount = JSON.parse(jsonString);
+        const app = initializeApp({
+          credential: cert(serviceAccount),
+          storageBucket: env.firebase.storageBucket || `${serviceAccount.project_id}.firebasestorage.app`,
+        });
+        console.log('✓ Firebase Admin initialized with FIREBASE_SERVICE_ACCOUNT_JSON environment variable');
+        return app;
+      } catch (jsonErr) {
+        console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', jsonErr.message);
+      }
+    }
+
+    // Option 3: Individual environment variables
     const hasRealKey = env.firebase.privateKey && 
                        !env.firebase.privateKey.includes('YOUR_PRIVATE_KEY_HERE') &&
                        !env.firebase.privateKey.includes('YOUR_KEY_HERE');
@@ -64,20 +83,20 @@ function initializeFirebaseAdmin() {
       return app;
     }
 
-    // Option 3: Try Application Default Credentials (ADC) / local environment auth
-    const options = {};
-    if (env.firebase.projectId) {
-      options.projectId = env.firebase.projectId;
+    // Option 4: Try ADC if explicitly in Google Cloud environment
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.K_SERVICE) {
+      const options = {};
+      if (env.firebase.projectId) options.projectId = env.firebase.projectId;
+      if (env.firebase.storageBucket) options.storageBucket = env.firebase.storageBucket;
+      const app = initializeApp(options);
+      console.log('✓ Firebase Admin initialized with Application Default Credentials (ADC)');
+      return app;
     }
-    if (env.firebase.storageBucket) {
-      options.storageBucket = env.firebase.storageBucket;
-    }
-    const app = initializeApp(options);
-    console.log(`✓ Firebase Admin initialized with Application Default Credentials (ADC)${options.projectId ? ' for project ' + options.projectId : ''}`);
-    return app;
+
+    console.warn('⚠️ No Firebase Admin credentials found. Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in Environment Variables.');
+    return null;
   } catch (error) {
     console.error('✗ Failed to initialize Firebase Admin:', error.message);
-    console.warn('⚠️ Server will run without Firebase operations. Configure backend/.env to enable Firebase features.');
     return null;
   }
 }
