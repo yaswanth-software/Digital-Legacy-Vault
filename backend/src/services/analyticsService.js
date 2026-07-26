@@ -1,14 +1,21 @@
 import { firestoreAdmin } from '../config/firebaseAdmin.js';
 import { getOrCreatePrimaryVault } from './vaultService.js';
 
-const vaultsCollection = firestoreAdmin ? firestoreAdmin.collection('vaults') : null;
+const getVaultsCollection = () => {
+  if (!firestoreAdmin) {
+    const err = new Error('Database service is unavailable. Please set FIREBASE_SERVICE_ACCOUNT_JSON in Vercel Environment Variables.');
+    err.status = 503;
+    throw err;
+  }
+  return firestoreAdmin.collection('vaults');
+};
 
 /**
  * Get aggregated intelligence analytics for the user's dashboard.
  */
 export async function getDashboardAnalytics(uid) {
   const vault = await getOrCreatePrimaryVault(uid);
-  const vaultRef = vaultsCollection.doc(vault.id);
+  const vaultRef = getVaultsCollection().doc(vault.id);
 
   // 1. Fetch Collections
   const [assetsSnap, tpSnap, rulesSnap, settingsDoc, releasesSnap, emergencySnap, eventsSnap] = await Promise.all([

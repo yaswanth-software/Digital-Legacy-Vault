@@ -1,13 +1,20 @@
 import { firestoreAdmin } from '../config/firebaseAdmin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
-const usersCollection = firestoreAdmin ? firestoreAdmin.collection('users') : null;
+const getUsersCollection = () => {
+  if (!firestoreAdmin) {
+    const err = new Error('Database service is unavailable. Please set FIREBASE_SERVICE_ACCOUNT_JSON in Vercel Environment Variables.');
+    err.status = 503;
+    throw err;
+  }
+  return firestoreAdmin.collection('users');
+};
 
 /**
  * Get user profile by UID
  */
 export async function getUserProfile(uid) {
-  const userDoc = await usersCollection.doc(uid).get();
+  const userDoc = await getUsersCollection().doc(uid).get();
 
   if (!userDoc.exists) {
     return null;
@@ -21,7 +28,7 @@ export async function getUserProfile(uid) {
  * Used during registration to create the initial profile
  */
 export async function createOrUpdateUserProfile(uid, userData) {
-  const userRef = usersCollection.doc(uid);
+  const userRef = getUsersCollection().doc(uid);
   const userDoc = await userRef.get();
 
   if (userDoc.exists) {
@@ -50,7 +57,7 @@ export async function createOrUpdateUserProfile(uid, userData) {
  * Update last login timestamp
  */
 export async function updateLastLogin(uid) {
-  const userRef = usersCollection.doc(uid);
+  const userRef = getUsersCollection().doc(uid);
   const userDoc = await userRef.get();
 
   if (userDoc.exists) {

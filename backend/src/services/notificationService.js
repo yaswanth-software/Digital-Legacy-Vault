@@ -1,7 +1,14 @@
 import { firestoreAdmin } from '../config/firebaseAdmin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
-const usersCollection = firestoreAdmin ? firestoreAdmin.collection('users') : null;
+const getUsersCollection = () => {
+  if (!firestoreAdmin) {
+    const err = new Error('Database service is unavailable. Please set FIREBASE_SERVICE_ACCOUNT_JSON in Vercel Environment Variables.');
+    err.status = 503;
+    throw err;
+  }
+  return firestoreAdmin.collection('users');
+};
 
 const CATEGORIES = ['security', 'continuity', 'legacy_rules', 'emergency_access', 'verification', 'releases', 'trusted_people', 'system'];
 const PRIORITIES = ['low', 'normal', 'high', 'critical'];
@@ -13,7 +20,7 @@ export async function createNotification(uid, data) {
   if (!uid) return null;
 
   try {
-    const userRef = usersCollection.doc(uid);
+    const userRef = getUsersCollection().doc(uid);
     const notificationsRef = userRef.collection('notifications');
     const newNotificationRef = notificationsRef.doc();
     const notificationId = newNotificationRef.id;
@@ -70,7 +77,7 @@ export async function sendEmailNotification(uid, notificationData) {
  */
 export async function getNotifications(uid, options = {}) {
   const { category, priority, unreadOnly, search, limit = 50 } = options;
-  const notifRef = usersCollection.doc(uid).collection('notifications');
+  const notifRef = getUsersCollection().doc(uid).collection('notifications');
 
   let query = notifRef.orderBy('createdAt', 'desc');
 
@@ -104,7 +111,7 @@ export async function getNotifications(uid, options = {}) {
  * Mark a single notification as read.
  */
 export async function markAsRead(uid, notificationId) {
-  const notifRef = usersCollection.doc(uid).collection('notifications').doc(notificationId);
+  const notifRef = getUsersCollection().doc(uid).collection('notifications').doc(notificationId);
   const doc = await notifRef.get();
   if (!doc.exists) {
     const error = new Error('Notification not found.');
@@ -124,7 +131,7 @@ export async function markAsRead(uid, notificationId) {
  * Mark all unread notifications as read.
  */
 export async function markAllAsRead(uid) {
-  const snapshot = await usersCollection.doc(uid).collection('notifications').where('read', '==', false).get();
+  const snapshot = await getUsersCollection().doc(uid).collection('notifications').where('read', '==', false).get();
   const batch = firestoreAdmin.batch();
 
   snapshot.docs.forEach(doc => {
@@ -142,7 +149,7 @@ export async function markAllAsRead(uid) {
  * Delete a notification.
  */
 export async function deleteNotification(uid, notificationId) {
-  const notifRef = usersCollection.doc(uid).collection('notifications').doc(notificationId);
+  const notifRef = getUsersCollection().doc(uid).collection('notifications').doc(notificationId);
   await notifRef.delete();
   return { id: notificationId, deleted: true };
 }
@@ -151,7 +158,7 @@ export async function deleteNotification(uid, notificationId) {
  * Get count of unread notifications.
  */
 export async function getUnreadCount(uid) {
-  const snapshot = await usersCollection.doc(uid).collection('notifications').where('read', '==', false).get();
+  const snapshot = await getUsersCollection().doc(uid).collection('notifications').where('read', '==', false).get();
   return snapshot.size;
 }
 
@@ -159,7 +166,7 @@ export async function getUnreadCount(uid) {
  * Get user notification settings.
  */
 export async function getNotificationPreferences(uid) {
-  const settingsDoc = await usersCollection.doc(uid).collection('settings').doc('notifications').get();
+  const settingsDoc = await getUsersCollection().doc(uid).collection('settings').doc('notifications').get();
   if (!settingsDoc.exists) {
     return {
       emailNotifications: true,
@@ -178,7 +185,7 @@ export async function getNotificationPreferences(uid) {
  * Update user notification settings.
  */
 export async function updateNotificationPreferences(uid, updates) {
-  const settingsRef = usersCollection.doc(uid).collection('settings').doc('notifications');
+  const settingsRef = getUsersCollection().doc(uid).collection('settings').doc('notifications');
   
   // Enforce security requirement: Security Alerts cannot be disabled!
   const sanitizedUpdates = {

@@ -1,7 +1,14 @@
 import { firestoreAdmin } from '../config/firebaseAdmin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
-const vaultsCollection = firestoreAdmin ? firestoreAdmin.collection('vaults') : null;
+const getVaultsCollection = () => {
+  if (!firestoreAdmin) {
+    const err = new Error('Database service is unavailable. Please set FIREBASE_SERVICE_ACCOUNT_JSON in Vercel Environment Variables.');
+    err.status = 503;
+    throw err;
+  }
+  return firestoreAdmin.collection('vaults');
+};
 
 /**
  * Helper to verify that the vault exists and belongs to the user.
@@ -11,7 +18,7 @@ const vaultsCollection = firestoreAdmin ? firestoreAdmin.collection('vaults') : 
  * @throws {Error} If vault not found or not owned by user
  */
 async function verifyVaultOwnership(uid, vaultId) {
-  const vaultDoc = await vaultsCollection.doc(vaultId).get();
+  const vaultDoc = await getVaultsCollection().doc(vaultId).get();
   if (!vaultDoc.exists) {
     const error = new Error('Vault not found.');
     error.status = 404;
@@ -31,7 +38,7 @@ async function verifyVaultOwnership(uid, vaultId) {
 export async function createAsset(uid, vaultId, assetData) {
   await verifyVaultOwnership(uid, vaultId);
 
-  const assetRef = vaultsCollection.doc(vaultId).collection('assets').doc();
+  const assetRef = getVaultsCollection().doc(vaultId).collection('assets').doc();
   const assetId = assetRef.id;
 
   const newAsset = {
@@ -61,7 +68,7 @@ export async function createAsset(uid, vaultId, assetData) {
 export async function getAssets(uid, vaultId, queryParams = {}) {
   await verifyVaultOwnership(uid, vaultId);
 
-  const assetsCollectionRef = vaultsCollection.doc(vaultId).collection('assets');
+  const assetsCollectionRef = getVaultsCollection().doc(vaultId).collection('assets');
   const snapshot = await assetsCollectionRef.get();
   let assets = snapshot.docs.map(doc => doc.data());
 
@@ -101,7 +108,7 @@ export async function getAssets(uid, vaultId, queryParams = {}) {
 export async function getAssetById(uid, vaultId, assetId) {
   await verifyVaultOwnership(uid, vaultId);
 
-  const assetRef = vaultsCollection.doc(vaultId).collection('assets').doc(assetId);
+  const assetRef = getVaultsCollection().doc(vaultId).collection('assets').doc(assetId);
   const assetDoc = await assetRef.get();
 
   if (!assetDoc.exists) {
@@ -128,7 +135,7 @@ export async function getAssetById(uid, vaultId, assetId) {
 export async function updateAsset(uid, vaultId, assetId, updateData) {
   await verifyVaultOwnership(uid, vaultId);
 
-  const assetRef = vaultsCollection.doc(vaultId).collection('assets').doc(assetId);
+  const assetRef = getVaultsCollection().doc(vaultId).collection('assets').doc(assetId);
   const assetDoc = await assetRef.get();
 
   if (!assetDoc.exists) {
@@ -175,7 +182,7 @@ export async function updateAsset(uid, vaultId, assetId, updateData) {
 export async function archiveAsset(uid, vaultId, assetId) {
   await verifyVaultOwnership(uid, vaultId);
 
-  const assetRef = vaultsCollection.doc(vaultId).collection('assets').doc(assetId);
+  const assetRef = getVaultsCollection().doc(vaultId).collection('assets').doc(assetId);
   const assetDoc = await assetRef.get();
 
   if (!assetDoc.exists) {
@@ -206,7 +213,7 @@ export async function archiveAsset(uid, vaultId, assetId) {
 export async function restoreAsset(uid, vaultId, assetId) {
   await verifyVaultOwnership(uid, vaultId);
 
-  const assetRef = vaultsCollection.doc(vaultId).collection('assets').doc(assetId);
+  const assetRef = getVaultsCollection().doc(vaultId).collection('assets').doc(assetId);
   const assetDoc = await assetRef.get();
 
   if (!assetDoc.exists) {
@@ -237,7 +244,7 @@ export async function restoreAsset(uid, vaultId, assetId) {
 export async function deleteAsset(uid, vaultId, assetId) {
   await verifyVaultOwnership(uid, vaultId);
 
-  const assetRef = vaultsCollection.doc(vaultId).collection('assets').doc(assetId);
+  const assetRef = getVaultsCollection().doc(vaultId).collection('assets').doc(assetId);
   const assetDoc = await assetRef.get();
 
   if (!assetDoc.exists) {

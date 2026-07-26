@@ -5,7 +5,14 @@ import env from '../config/env.js';
 import { sendInvitationEmail } from './emailService.js';
 import { getOrCreatePrimaryVault } from './vaultService.js';
 
-const vaultsCollection = firestoreAdmin ? firestoreAdmin.collection('vaults') : null;
+const getVaultsCollection = () => {
+  if (!firestoreAdmin) {
+    const err = new Error('Database service is unavailable. Please set FIREBASE_SERVICE_ACCOUNT_JSON in Vercel Environment Variables.');
+    err.status = 503;
+    throw err;
+  }
+  return firestoreAdmin.collection('vaults');
+};
 
 // Presets validation lists
 const RELATIONSHIPS = [
@@ -23,7 +30,7 @@ const ROLES = [
  */
 export async function logAuditEvent(vaultId, ownerId, actorId, action, targetType, targetId) {
   try {
-    const logRef = vaultsCollection.doc(vaultId).collection('auditLogs').doc();
+    const logRef = getVaultsCollection().doc(vaultId).collection('auditLogs').doc();
     await logRef.set({
       id: logRef.id,
       ownerId,
@@ -69,7 +76,7 @@ export function validateTrustedPersonInput(data) {
  * Verify vault ownership.
  */
 async function verifyVaultOwnership(uid, vaultId) {
-  const vaultDoc = await vaultsCollection.doc(vaultId).get();
+  const vaultDoc = await getVaultsCollection().doc(vaultId).get();
   if (!vaultDoc.exists) {
     const error = new Error('Vault not found.');
     error.status = 404;
@@ -106,7 +113,7 @@ export async function createTrustedPerson(uid, ownerEmail, ownerName, vaultId, d
     throw err;
   }
 
-  const trustedPeopleRef = vaultsCollection.doc(vaultId).collection('trustedPeople');
+  const trustedPeopleRef = getVaultsCollection().doc(vaultId).collection('trustedPeople');
 
   // Check duplicate active or pending trusted person with this email
   const duplicateQuery = await trustedPeopleRef
@@ -186,7 +193,7 @@ export async function createTrustedPerson(uid, ownerEmail, ownerName, vaultId, d
 export async function getTrustedPeople(uid, vaultId, queryParams = {}) {
   await verifyVaultOwnership(uid, vaultId);
 
-  const trustedPeopleRef = vaultsCollection.doc(vaultId).collection('trustedPeople');
+  const trustedPeopleRef = getVaultsCollection().doc(vaultId).collection('trustedPeople');
   const snapshot = await trustedPeopleRef.get();
   let list = snapshot.docs.map(doc => doc.data());
 
@@ -205,7 +212,7 @@ export async function getTrustedPeople(uid, vaultId, queryParams = {}) {
 export async function getTrustedPersonById(uid, vaultId, trustedPersonId) {
   await verifyVaultOwnership(uid, vaultId);
 
-  const tpDoc = await vaultsCollection.doc(vaultId).collection('trustedPeople').doc(trustedPersonId).get();
+  const tpDoc = await getVaultsCollection().doc(vaultId).collection('trustedPeople').doc(trustedPersonId).get();
   if (!tpDoc.exists) {
     const error = new Error('Trusted person not found.');
     error.status = 404;
@@ -257,7 +264,7 @@ export async function updateTrustedPerson(uid, ownerName, ownerEmail, vaultId, t
     }
 
     // Check duplicate
-    const duplicateQuery = await vaultsCollection.doc(vaultId).collection('trustedPeople')
+    const duplicateQuery = await getVaultsCollection().doc(vaultId).collection('trustedPeople')
       .where('email', '==', newEmail)
       .get();
 
@@ -342,7 +349,7 @@ export async function updateTrustedPerson(uid, ownerName, ownerEmail, vaultId, t
     await logAuditEvent(vaultId, uid, uid, 'invitation_sent', 'trusted_person', trustedPersonId);
   }
 
-  const tpRef = vaultsCollection.doc(vaultId).collection('trustedPeople').doc(trustedPersonId);
+  const tpRef = getVaultsCollection().doc(vaultId).collection('trustedPeople').doc(trustedPersonId);
   await tpRef.update(allowedUpdates);
 
   const updatedDoc = await tpRef.get();
@@ -360,7 +367,7 @@ export async function updateTrustedPerson(uid, ownerName, ownerEmail, vaultId, t
 export async function revokeTrustedPerson(uid, vaultId, trustedPersonId) {
   const tp = await getTrustedPersonById(uid, vaultId, trustedPersonId);
 
-  const tpRef = vaultsCollection.doc(vaultId).collection('trustedPeople').doc(trustedPersonId);
+  const tpRef = getVaultsCollection().doc(vaultId).collection('trustedPeople').doc(trustedPersonId);
   await tpRef.update({
     status: 'revoked',
     invitationStatus: 'revoked',
@@ -370,7 +377,7 @@ export async function revokeTrustedPerson(uid, vaultId, trustedPersonId) {
   });
 
   // Revoke all access permissions
-  const permissionsRef = vaultsCollection.doc(vaultId).collection('accessPermissions');
+  const permissionsRef = getVaultsCollection().doc(vaultId).collection('accessPermissions');
   const snapshot = await permissionsRef.where('trustedPersonId', '==', trustedPersonId).get();
   
   const batch = firestoreAdmin.batch();
@@ -390,7 +397,7 @@ export async function revokeTrustedPerson(uid, vaultId, trustedPersonId) {
 export async function softRemoveTrustedPerson(uid, vaultId, trustedPersonId) {
   const tp = await getTrustedPersonById(uid, vaultId, trustedPersonId);
 
-  const tpRef = vaultsCollection.doc(vaultId).collection('trustedPeople').doc(trustedPersonId);
+  const tpRef = getVaultsCollection().doc(vaultId).collection('trustedPeople').doc(trustedPersonId);
   await tpRef.update({
     status: 'revoked',
     invitationStatus: 'revoked',
@@ -402,7 +409,7 @@ export async function softRemoveTrustedPerson(uid, vaultId, trustedPersonId) {
   });
 
   // Revoke access permissions
-  const permissionsRef = vaultsCollection.doc(vaultId).collection('accessPermissions');
+  const permissionsRef = getVaultsCollection().doc(vaultId).collection('accessPermissions');
   const snapshot = await permissionsRef.where('trustedPersonId', '==', trustedPersonId).get();
   
   const batch = firestoreAdmin.batch();

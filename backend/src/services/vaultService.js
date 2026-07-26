@@ -1,7 +1,14 @@
 import { firestoreAdmin } from '../config/firebaseAdmin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
-const vaultsCollection = firestoreAdmin ? firestoreAdmin.collection('vaults') : null;
+const getVaultsCollection = () => {
+  if (!firestoreAdmin) {
+    const err = new Error('Database service is unavailable. Please set FIREBASE_SERVICE_ACCOUNT_JSON in Vercel Environment Variables.');
+    err.status = 503;
+    throw err;
+  }
+  return firestoreAdmin.collection('vaults');
+};
 
 /**
  * Get or create the authenticated user's primary legacy vault.
@@ -11,7 +18,7 @@ const vaultsCollection = firestoreAdmin ? firestoreAdmin.collection('vaults') : 
  * @returns {Promise<object>} Vault data
  */
 export async function getOrCreatePrimaryVault(uid) {
-  const querySnapshot = await vaultsCollection.where('ownerId', '==', uid).limit(1).get();
+  const querySnapshot = await getVaultsCollection().where('ownerId', '==', uid).limit(1).get();
 
   if (!querySnapshot.empty) {
     const vaultDoc = querySnapshot.docs[0];
@@ -19,7 +26,7 @@ export async function getOrCreatePrimaryVault(uid) {
   }
 
   // Vault does not exist, create it
-  const vaultRef = vaultsCollection.doc();
+  const vaultRef = getVaultsCollection().doc();
   const vaultId = vaultRef.id;
   const newVault = {
     id: vaultId,
@@ -45,7 +52,7 @@ export async function getOrCreatePrimaryVault(uid) {
  * @returns {Promise<object>} Updated vault data
  */
 export async function updateVault(uid, vaultId, updateData) {
-  const vaultRef = vaultsCollection.doc(vaultId);
+  const vaultRef = getVaultsCollection().doc(vaultId);
   const vaultDoc = await vaultRef.get();
 
   if (!vaultDoc.exists) {
