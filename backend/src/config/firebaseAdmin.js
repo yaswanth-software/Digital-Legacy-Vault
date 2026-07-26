@@ -8,9 +8,16 @@ import env from './env.js';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const backendDir = resolve(__dirname, '../..');
+let backendDir = process.cwd();
+try {
+  if (import.meta && import.meta.url) {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    backendDir = resolve(__dirname, '../..');
+  }
+} catch (pathErr) {
+  // Fallback to process.cwd() in bundled environments
+}
 
 function initializeFirebaseAdmin() {
   // Avoid re-initialization

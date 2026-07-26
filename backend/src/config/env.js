@@ -2,12 +2,22 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const backendDir = resolve(__dirname, '../..');
+let backendDir = process.cwd();
+try {
+  if (import.meta && import.meta.url) {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    backendDir = resolve(__dirname, '../..');
+  }
+} catch (pathErr) {
+  // Fallback to process.cwd() in bundled environments
+}
 
-// Load environment variables from .env
-dotenv.config({ path: resolve(backendDir, '.env') });
+try {
+  dotenv.config({ path: resolve(backendDir, '.env') });
+} catch (envErr) {
+  // Ignore missing .env in production/serverless
+}
 
 const env = {
   port: parseInt(process.env.PORT, 10) || 5000,
