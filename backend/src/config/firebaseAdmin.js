@@ -109,7 +109,28 @@ function initializeFirebaseAdmin() {
 }
 
 const firebaseAdmin = initializeFirebaseAdmin();
-export const authAdmin = firebaseAdmin ? getAuth(firebaseAdmin) : null;
-export const firestoreAdmin = firebaseAdmin ? getFirestore(firebaseAdmin) : null;
-export const storageAdmin = firebaseAdmin ? getStorage(firebaseAdmin) : null;
+
+let authAdmin = null;
+let firestoreAdmin = null;
+let storageAdmin = null;
+
+if (firebaseAdmin) {
+  try {
+    authAdmin = getAuth(firebaseAdmin);
+  } catch (err) {
+    console.error('Failed to getAuth:', err.message);
+  }
+  try {
+    firestoreAdmin = getFirestore(firebaseAdmin);
+  } catch (err) {
+    console.error('Failed to getFirestore:', err.message);
+  }
+  try {
+    storageAdmin = getStorage(firebaseAdmin);
+  } catch (err) {
+    console.error('Failed to getStorage:', err.message);
+  }
+}
+
+export { authAdmin, firestoreAdmin, storageAdmin };
 export default firebaseAdmin;
