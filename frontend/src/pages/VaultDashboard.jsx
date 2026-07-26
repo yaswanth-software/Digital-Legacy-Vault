@@ -241,25 +241,19 @@ export default function VaultDashboard() {
           <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <div>
+          <div className="w-full">
             <h4 className="text-sm font-bold text-red-800">
-              {error.includes('backend/.env') ? 'Configuration Required' : 'Connection Error'}
+              {error.includes('FIREBASE_SERVICE_ACCOUNT_JSON') || error.includes('backend/.env') ? 'Database Configuration Required' : 'Connection Error'}
             </h4>
             <p className="text-xs text-red-700 mt-1 leading-relaxed">{error}</p>
-            {error.includes('backend/.env') && (
+            {(error.includes('FIREBASE_SERVICE_ACCOUNT_JSON') || error.includes('backend/.env') || error.includes('Database service is unavailable')) && (
               <div className="mt-4 pt-3 border-t border-red-150 text-xs text-red-800">
-                <p className="font-bold text-red-800 mb-1.5 uppercase tracking-wider text-[10px]">How to resolve this:</p>
+                <p className="font-bold text-red-800 mb-1.5 uppercase tracking-wider text-[10px]">Action Required on Vercel:</p>
                 <ol className="list-decimal pl-4 space-y-1.5 leading-relaxed font-medium">
-                  <li>Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline text-indigo-700 hover:text-indigo-900 font-bold">Firebase Console</a>.</li>
-                  <li>Navigate to <strong>Project Settings</strong> &rarr; <strong>Service Accounts</strong> for project <code>digital-legacy-vault-61b0a</code>.</li>
-                  <li>Click <strong>Generate new private key</strong> to download your service account JSON file.</li>
-                  <li>Open <code>backend/.env</code> in your editor and copy the values for:
-                    <ul className="list-disc pl-5 mt-1 font-mono text-[10px] bg-red-100/50 p-1.5 rounded border border-red-200">
-                      <li><code>FIREBASE_CLIENT_EMAIL</code></li>
-                      <li><code>FIREBASE_PRIVATE_KEY</code> (include the full key starting with <code>-----BEGIN PRIVATE KEY-----</code> and replace newlines with <code>\n</code>)</li>
-                    </ul>
-                  </li>
-                  <li>Restart your backend server to load the new credentials.</li>
+                  <li>Open your <strong>Vercel Project Settings</strong> &rarr; <strong>Environment Variables</strong>.</li>
+                  <li>Add key: <code className="bg-red-100 px-1 py-0.5 rounded font-mono text-[10px]">FIREBASE_SERVICE_ACCOUNT_JSON</code>.</li>
+                  <li>Paste your raw service account JSON string from <code className="bg-red-100 px-1 py-0.5 rounded font-mono text-[10px]">backend/service-account.json</code>.</li>
+                  <li>Go to <strong>Deployments</strong> and click <strong>Redeploy</strong>.</li>
                 </ol>
               </div>
             )}
