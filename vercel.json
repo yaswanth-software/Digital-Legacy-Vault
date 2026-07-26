@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm install --prefix frontend && npm run build --prefix frontend",
+  "buildCommand": "if [ -d \"frontend\" ]; then cd frontend && npm install && npm run build; else npm install && npm run build && mkdir -p frontend && cp -r dist frontend/ 2>/dev/null || true; fi",
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
