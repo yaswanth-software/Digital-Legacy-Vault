@@ -8,13 +8,10 @@ export function notFoundHandler(req, res) {
 }
 
 export function errorHandler(err, req, res, next) {
-  console.error('Error:', err.message);
+  console.error('Error:', err.stack || err.message);
 
-  // Don't expose stack traces or internal details in production
   const statusCode = err.statusCode || 500;
-  const message = env.isProduction()
-    ? 'An internal server error occurred.'
-    : err.message || 'An internal server error occurred.';
+  const message = err.message || 'An internal server error occurred.';
 
   res.status(statusCode).json({
     success: false,

@@ -4,7 +4,7 @@ export async function authenticate(req, res, next) {
   if (!authAdmin) {
     return res.status(503).json({
       success: false,
-      message: 'Authentication service is currently unavailable. Please verify backend/.env configuration.',
+      message: 'Authentication service is unavailable. Please add FIREBASE_SERVICE_ACCOUNT_JSON to Vercel Environment Variables.',
     });
   }
 
