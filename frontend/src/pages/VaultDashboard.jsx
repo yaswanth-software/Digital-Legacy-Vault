@@ -68,7 +68,7 @@ export default function VaultDashboard() {
       }
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Cannot connect to backend server at http://127.0.0.1:5000/api. Please ensure your backend server is running and restart Vite (run npm run dev in project root).');
+      setError(err.response?.data?.message || 'Cannot connect to backend server. Please check your network connection or server status.');
     } finally {
       setLoading(false);
     }

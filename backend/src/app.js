@@ -36,6 +36,15 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ===== Health Check =====
+const handleHealth = (req, res) => {
+  res.json({
+    success: true,
+    message: 'LegacyOS backend is running',
+    environment: env.nodeEnv,
+    timestamp: new Date().toISOString(),
+  });
+};
+
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -44,33 +53,31 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'LegacyOS backend is running',
-    environment: env.nodeEnv,
-    timestamp: new Date().toISOString(),
-  });
-});
+app.get('/health', handleHealth);
+app.get('/api/health', handleHealth);
 
-// ===== API Routes =====
-app.use('/api/users', userRoutes);
-app.use('/api/vault', vaultRoutes);
-app.use('/api/trusted-people', trustedPersonRoutes);
-app.use('/api/invitations', invitationRoutes);
-app.use('/api/continuity', continuityRoutes);
-app.use('/api/legacy-rules', legacyRuleRoutes);
-app.use('/api/confirmations', confirmationRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/internal', internalRoutes);
-app.use('/api/emergency-access', emergencyAccessRoutes);
-app.use('/api/verifications', verificationRoutes);
-app.use('/api/releases', releaseRoutes);
-app.use('/api/security', securityRoutes);
-app.use('/api/privacy', privacyRoutes);
-app.use('/api/dashboard', analyticsRoutes);
-app.use('/api/activity', activityRoutes);
-app.use('/api/search', searchRoutes);
+// ===== API Router (supports both /api/* and /*) =====
+const apiRouter = express.Router();
+apiRouter.use('/users', userRoutes);
+apiRouter.use('/vault', vaultRoutes);
+apiRouter.use('/trusted-people', trustedPersonRoutes);
+apiRouter.use('/invitations', invitationRoutes);
+apiRouter.use('/continuity', continuityRoutes);
+apiRouter.use('/legacy-rules', legacyRuleRoutes);
+apiRouter.use('/confirmations', confirmationRoutes);
+apiRouter.use('/notifications', notificationRoutes);
+apiRouter.use('/internal', internalRoutes);
+apiRouter.use('/emergency-access', emergencyAccessRoutes);
+apiRouter.use('/verifications', verificationRoutes);
+apiRouter.use('/releases', releaseRoutes);
+apiRouter.use('/security', securityRoutes);
+apiRouter.use('/privacy', privacyRoutes);
+apiRouter.use('/dashboard', analyticsRoutes);
+apiRouter.use('/activity', activityRoutes);
+apiRouter.use('/search', searchRoutes);
+
+app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 // ===== Error Handling =====
 app.use(notFoundHandler);

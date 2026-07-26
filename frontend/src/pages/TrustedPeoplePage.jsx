@@ -66,7 +66,7 @@ export default function TrustedPeoplePage() {
     } catch (err) {
       console.error(err);
       if (!err.response) {
-        setError('Unable to connect to backend server. Please ensure the backend is running on http://localhost:5000.');
+        setError('Unable to connect to backend service. Please check network connection or backend server status.');
       } else {
         setError(err.response?.data?.message || 'Failed to retrieve trusted people list.');
       }
