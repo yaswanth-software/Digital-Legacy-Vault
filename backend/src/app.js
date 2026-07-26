@@ -73,6 +73,14 @@ app.get('/api/health', handleHealth);
 
 // ===== API Router (supports both /api/* and /*) =====
 const apiRouter = express.Router();
+apiRouter.get('/health', handleHealth);
+apiRouter.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'LegacyOS API is running',
+    health: '/api/health',
+  });
+});
 apiRouter.use('/users', userRoutes);
 apiRouter.use('/vault', vaultRoutes);
 apiRouter.use('/trusted-people', trustedPersonRoutes);
