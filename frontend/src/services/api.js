@@ -2,17 +2,18 @@ import axios from 'axios';
 import { auth } from './firebase';
 
 const getBaseUrl = () => {
-  // If running in browser on a deployed domain (Vercel, custom domain, etc.), ALWAYS use relative '/api'
+  // If explicitly set via environment variable (e.g. deployed backend service URL), use it
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+
+  // If running on a deployed domain (Vercel, etc.) without custom backend URL, use relative '/api'
   if (
     typeof window !== 'undefined' &&
     window.location.hostname !== 'localhost' &&
     window.location.hostname !== '127.0.0.1'
   ) {
     return '/api';
-  }
-
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
   }
 
   return 'http://127.0.0.1:5000/api';
