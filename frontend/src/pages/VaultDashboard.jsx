@@ -619,24 +619,20 @@ export default function VaultDashboard() {
                 </div>
 
                 <div className="mt-6 border-t border-slate-100 pt-4">
-                  {/* File Upload Status Banner */}
-                  <div className="mb-4 bg-slate-50 border border-slate-100 rounded-lg py-2 px-3 flex items-center justify-between text-[11px] font-medium text-slate-600">
-                    <span className="flex items-center gap-1.5 font-semibold">
-                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                      </svg>
-                      {asset.fileCount && asset.fileCount > 0 
-                        ? `${asset.fileCount} Attached ${asset.fileCount === 1 ? 'File' : 'Files'}`
-                        : 'No Attached Files'}
-                    </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      asset.fileCount && asset.fileCount > 0
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                        : 'bg-slate-100 text-slate-500'
-                    }`}>
-                      {asset.fileCount && asset.fileCount > 0 ? `${asset.fileCount} Active` : '0 Files'}
-                    </span>
-                  </div>
+                  {/* File Upload Status Banner - Only shown when asset has attached files */}
+                  {asset.fileCount && asset.fileCount > 0 ? (
+                    <div className="mb-4 bg-emerald-50/70 border border-emerald-100 rounded-lg py-2 px-3 flex items-center justify-between text-[11px] font-medium text-emerald-800">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        {asset.fileCount} {asset.fileCount === 1 ? 'File Attached' : 'Files Attached'}
+                      </span>
+                      <span className="text-[10px] font-bold bg-emerald-100/80 text-emerald-700 px-2 py-0.5 rounded">
+                        Active
+                      </span>
+                    </div>
+                  ) : null}
 
                   <div className="flex items-center justify-between">
                     {/* Priority and Date Info */}
