@@ -211,7 +211,9 @@ export async function downloadFile(req, res, next) {
     if (result.isLocal && result.localFilePath) {
       const protocol = req.protocol || 'http';
       const host = req.get('host') || 'localhost:5000';
-      const rawUrl = `${protocol}://${host}/api/vault/assets/${assetId}/files/${fileId}/raw`;
+      const userToken = req.headers.authorization ? req.headers.authorization.split('Bearer ')[1] : '';
+      const tokenQuery = userToken ? `?token=${encodeURIComponent(userToken)}` : '';
+      const rawUrl = `${protocol}://${host}/api/vault/assets/${assetId}/files/${fileId}/raw${tokenQuery}`;
       return res.json({
         success: true,
         data: {

@@ -9,21 +9,19 @@ export async function authenticate(req, res, next) {
   }
 
   try {
+    let token;
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access denied. No authentication token provided.',
-      });
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split('Bearer ')[1];
+    } else if (req.query && req.query.token) {
+      token = req.query.token;
     }
-
-    const token = authHeader.split('Bearer ')[1];
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Access denied. Invalid token format.',
+        message: 'Access denied. No authentication token provided.',
       });
     }
 
