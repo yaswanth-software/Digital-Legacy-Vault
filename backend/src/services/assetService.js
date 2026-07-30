@@ -53,6 +53,7 @@ export async function createAsset(uid, vaultId, assetData) {
     priority: assetData.priority || 'medium',
     tags: Array.isArray(assetData.tags) ? assetData.tags : [],
     notes: (assetData.notes || '').trim(),
+    fileCount: 0,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };
@@ -63,14 +64,23 @@ export async function createAsset(uid, vaultId, assetData) {
 }
 
 /**
- * Retrieve assets for the user's vault, applying optional query criteria.
+ * Retrieve list of assets for a specific vault with optional filters.
  */
 export async function getAssets(uid, vaultId, queryParams = {}) {
   await verifyVaultOwnership(uid, vaultId);
 
   const assetsCollectionRef = getVaultsCollection().doc(vaultId).collection('assets');
   const snapshot = await assetsCollectionRef.get();
-  let assets = snapshot.docs.map(doc => doc.data());
+  let assets = await Promise.all(
+    snapshot.docs.map(async (doc) => {
+      const data = doc.data();
+      if (typeof data.fileCount !== 'number') {
+        const filesSnap = await doc.ref.collection('files').get();
+        data.fileCount = filesSnap.size;
+      }
+      return data;
+    })
+  );
 
   // Programmatic filtering to avoid composite indexing requirements
   const statusFilter = queryParams.status || 'active';
