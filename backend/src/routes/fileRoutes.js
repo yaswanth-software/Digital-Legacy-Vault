@@ -5,6 +5,7 @@ import {
   getFiles,
   getFileById,
   downloadFile,
+  serveRawFile,
   deleteFile
 } from '../controllers/fileController.js';
 
@@ -29,6 +30,9 @@ router.get('/:fileId', getFileById);
 
 // GET /api/vault/assets/:assetId/files/:fileId/download — Generate short-lived download URL
 router.get('/:fileId/download', downloadFile);
+
+// GET /api/vault/assets/:assetId/files/:fileId/raw — Stream file content directly
+router.get('/:fileId/raw', serveRawFile);
 
 // DELETE /api/vault/assets/:assetId/files/:fileId — Delete file from Storage and Firestore
 router.delete('/:fileId', deleteFile);

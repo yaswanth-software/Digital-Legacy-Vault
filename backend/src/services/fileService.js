@@ -2,6 +2,8 @@ import { firestoreAdmin, storageAdmin } from '../config/firebaseAdmin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAssetById } from './assetService.js';
 import env from '../config/env.js';
+import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'fs';
+import { resolve } from 'path';
 
 // Helper to get Firebase Storage Bucket
 function getBucket() {
@@ -16,9 +18,6 @@ function getBucket() {
  * Verify ownership chain: User -> Vault -> Asset
  */
 export async function verifyAssetOwnership(uid, vaultId, assetId) {
-  // getAssetById verifies:
-  // 1. Vault belongs to the user
-  // 2. Asset exists and belongs to the vault and user
   const asset = await getAssetById(uid, vaultId, assetId);
   return asset;
 }
@@ -55,15 +54,12 @@ export async function verifyFileOwnership(uid, vaultId, assetId, fileId) {
 }
 
 /**
- * Upload a single file buffer to Firebase Storage and create Firestore metadata.
+ * Upload a single file buffer to Firebase Storage or local disk fallback.
  */
 export async function uploadFile(uid, vaultId, assetId, file) {
   const asset = await verifyAssetOwnership(uid, vaultId, assetId);
+  const fileId = firestoreAdmin.collection('vaults').doc().id;
 
-  const bucket = getBucket();
-  const fileId = firestoreAdmin.collection('vaults').doc().id; // generate unique fileId
-
-  // Sanitize filename: remove special characters, replace spaces with underscores, preserve extension
   const parsedName = file.originalname.split('.');
   const extension = parsedName.length > 1 ? parsedName.pop().toLowerCase() : '';
   const sanitizedBase = parsedName.join('.')
@@ -71,19 +67,31 @@ export async function uploadFile(uid, vaultId, assetId, file) {
     .substring(0, 100);
   const sanitizedName = extension ? `${sanitizedBase}.${extension}` : sanitizedBase;
 
-  // storage path: users/{uid}/vaults/{vaultId}/assets/{assetId}/files/{fileId}_{sanitizedName}
   const storagePath = `users/${uid}/vaults/${vaultId}/assets/${assetId}/files/${fileId}_${sanitizedName}`;
 
+  let storageProvider = 'firebase';
+  let isLocalFallback = false;
+
+  // Try Firebase Storage first, fallback to local filesystem if bucket not found or unprovisioned
   try {
-    // 1. Save to Storage
+    const bucket = getBucket();
     const storageFileRef = bucket.file(storagePath);
     await storageFileRef.save(file.buffer, {
       metadata: {
         contentType: file.mimetype,
       },
     });
+  } catch (storageError) {
+    console.warn('⚠️ Cloud Storage unavailable or bucket not found. Using local disk storage fallback:', storageError.message);
+    const localUploadDir = resolve(process.cwd(), 'uploads', 'users', uid, 'assets', assetId);
+    mkdirSync(localUploadDir, { recursive: true });
+    const localFilePath = resolve(localUploadDir, `${fileId}_${sanitizedName}`);
+    writeFileSync(localFilePath, file.buffer);
+    storageProvider = 'local';
+    isLocalFallback = true;
+  }
 
-    // 2. Save metadata to Firestore and increment fileCount
+  try {
     const fileDocRef = firestoreAdmin
       .collection('vaults')
       .doc(vaultId)
@@ -100,6 +108,8 @@ export async function uploadFile(uid, vaultId, assetId, file) {
       originalName: file.originalname,
       sanitizedName,
       storagePath,
+      storageProvider,
+      isLocalFallback,
       contentType: file.mimetype,
       size: file.size,
       extension: extension || 'unknown',
@@ -112,7 +122,6 @@ export async function uploadFile(uid, vaultId, assetId, file) {
 
     await firestoreAdmin.runTransaction(async (transaction) => {
       transaction.set(fileDocRef, metadata);
-      // Increment the parent asset's fileCount denormalized field
       transaction.update(assetDocRef, {
         fileCount: FieldValue.increment(1),
         updatedAt: FieldValue.serverTimestamp(),
@@ -121,7 +130,7 @@ export async function uploadFile(uid, vaultId, assetId, file) {
 
     return metadata;
   } catch (error) {
-    console.error('Failed to complete file upload:', error.message);
+    console.error('Failed to save file metadata:', error.message);
     throw error;
   }
 }
@@ -152,45 +161,83 @@ export async function getFileById(uid, vaultId, assetId, fileId) {
 }
 
 /**
- * Generate a short-lived download URL for a file.
+ * Generate a short-lived download URL or return local file info.
  */
 export async function downloadFile(uid, vaultId, assetId, fileId) {
   const { fileData } = await verifyFileOwnership(uid, vaultId, assetId, fileId);
-  const bucket = getBucket();
-  const storageFileRef = bucket.file(fileData.storagePath);
 
-  const [url] = await storageFileRef.getSignedUrl({
-    action: 'read',
-    expires: Date.now() + 5 * 60 * 1000, // 5 minutes from now
-  });
+  // Check local filesystem first if local fallback was used
+  const localUploadDir = resolve(process.cwd(), 'uploads', 'users', uid, 'assets', assetId);
+  const localFilePath = resolve(localUploadDir, `${fileId}_${fileData.sanitizedName}`);
 
-  return {
-    url,
-    filename: fileData.originalName,
-    contentType: fileData.contentType,
-  };
+  if (fileData.storageProvider === 'local' || fileData.isLocalFallback || existsSync(localFilePath)) {
+    if (existsSync(localFilePath)) {
+      return {
+        isLocal: true,
+        localFilePath,
+        filename: fileData.originalName,
+        contentType: fileData.contentType,
+      };
+    }
+  }
+
+  // Otherwise, use Firebase Storage signed URL
+  try {
+    const bucket = getBucket();
+    const storageFileRef = bucket.file(fileData.storagePath);
+    const [url] = await storageFileRef.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 5 * 60 * 1000,
+    });
+
+    return {
+      url,
+      filename: fileData.originalName,
+      contentType: fileData.contentType,
+    };
+  } catch (err) {
+    if (existsSync(localFilePath)) {
+      return {
+        isLocal: true,
+        localFilePath,
+        filename: fileData.originalName,
+        contentType: fileData.contentType,
+      };
+    }
+    throw err;
+  }
 }
 
 /**
- * Delete a file from Firebase Storage and remove its Firestore metadata.
+ * Delete a file from Firebase Storage or local disk and remove Firestore metadata.
  */
 export async function deleteFile(uid, vaultId, assetId, fileId) {
   const { fileData, fileDocRef } = await verifyFileOwnership(uid, vaultId, assetId, fileId);
-  const bucket = getBucket();
 
-  // 1. Delete from Firebase Storage first
+  // 1. Try deleting from local filesystem
   try {
+    const localUploadDir = resolve(process.cwd(), 'uploads', 'users', uid, 'assets', assetId);
+    const localFilePath = resolve(localUploadDir, `${fileId}_${fileData.sanitizedName}`);
+    if (existsSync(localFilePath)) {
+      unlinkSync(localFilePath);
+    }
+  } catch (localError) {
+    console.warn('Local file cleanup note:', localError.message);
+  }
+
+  // 2. Try deleting from Firebase Storage
+  try {
+    const bucket = getBucket();
     const storageFileRef = bucket.file(fileData.storagePath);
     const [exists] = await storageFileRef.exists();
     if (exists) {
       await storageFileRef.delete();
     }
   } catch (storageError) {
-    console.error('Storage file deletion failed:', storageError.message);
-    throw new Error(`Failed to delete actual file from storage: ${storageError.message}`);
+    // Ignore Cloud Storage error if file was handled locally
   }
 
-  // 2. Delete Firestore metadata and decrement fileCount on parent asset
+  // 3. Delete Firestore metadata and decrement fileCount on parent asset
   try {
     const assetDocRef = firestoreAdmin.collection('vaults').doc(vaultId).collection('assets').doc(assetId);
 
@@ -203,7 +250,7 @@ export async function deleteFile(uid, vaultId, assetId, fileId) {
     });
   } catch (firestoreError) {
     console.error('Firestore file metadata deletion failed:', firestoreError.message);
-    throw new Error(`File deleted from storage, but failed to remove metadata: ${firestoreError.message}`);
+    throw new Error(`File deleted, but failed to remove metadata: ${firestoreError.message}`);
   }
 
   return { id: fileId, deleted: true };

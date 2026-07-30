@@ -198,7 +198,7 @@ export async function getFileById(req, res, next) {
 
 /**
  * GET /api/vault/assets/:assetId/files/:fileId/download
- * Generate a secure signed URL to download or open the file.
+ * Generate a secure signed URL or local endpoint URL to download or open the file.
  */
 export async function downloadFile(req, res, next) {
   try {
@@ -208,10 +208,58 @@ export async function downloadFile(req, res, next) {
     const vault = await getOrCreatePrimaryVault(uid);
     const result = await fileService.downloadFile(uid, vault.id, assetId, fileId);
 
+    if (result.isLocal && result.localFilePath) {
+      const protocol = req.protocol || 'http';
+      const host = req.get('host') || 'localhost:5000';
+      const rawUrl = `${protocol}://${host}/api/vault/assets/${assetId}/files/${fileId}/raw`;
+      return res.json({
+        success: true,
+        data: {
+          url: rawUrl,
+          filename: result.filename,
+          contentType: result.contentType,
+        },
+      });
+    }
+
     res.json({
       success: true,
       data: result,
     });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * GET /api/vault/assets/:assetId/files/:fileId/raw
+ * Serve the raw binary content of a file.
+ */
+export async function serveRawFile(req, res, next) {
+  try {
+    const uid = req.user.uid;
+    const { assetId, fileId } = req.params;
+
+    const vault = await getOrCreatePrimaryVault(uid);
+    const result = await fileService.downloadFile(uid, vault.id, assetId, fileId);
+
+    if (result.isLocal && result.localFilePath) {
+      res.setHeader('Content-Type', result.contentType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${result.filename}"`);
+      return res.sendFile(result.localFilePath);
+    }
+
+    if (result.url) {
+      return res.redirect(result.url);
+    }
+
+    res.status(404).json({ success: false, message: 'File stream not found.' });
   } catch (error) {
     if (error.status) {
       return res.status(error.status).json({
