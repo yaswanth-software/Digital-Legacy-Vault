@@ -26,7 +26,26 @@ function initializeFirebaseAdmin() {
   }
 
   try {
-    // Option 1: Service account file path (if file exists)
+    // Option 1: JSON string or Base64 in FIREBASE_SERVICE_ACCOUNT_JSON env var (Highest priority for cloud deployments like Render/Vercel)
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON && process.env.FIREBASE_SERVICE_ACCOUNT_JSON.trim()) {
+      try {
+        const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON.trim();
+        const jsonString = rawJson.startsWith('{')
+          ? rawJson
+          : Buffer.from(rawJson, 'base64').toString('utf8');
+        const serviceAccount = JSON.parse(jsonString);
+        const app = initializeApp({
+          credential: cert(serviceAccount),
+          storageBucket: env.firebase.storageBucket || `${serviceAccount.project_id}.firebasestorage.app`,
+        });
+        console.log('✓ Firebase Admin initialized with FIREBASE_SERVICE_ACCOUNT_JSON environment variable');
+        return app;
+      } catch (jsonErr) {
+        console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', jsonErr.message);
+      }
+    }
+
+    // Option 2: Service account file path (if file exists locally)
     const candidatePaths = [
       env.firebase.serviceAccountPath,
       'service-account.json',
@@ -50,25 +69,6 @@ function initializeFirebaseAdmin() {
         });
         console.log('✓ Firebase Admin initialized with service account file:', resolvedPath);
         return app;
-      }
-    }
-
-    // Option 2: JSON string or Base64 in FIREBASE_SERVICE_ACCOUNT_JSON env var
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-      try {
-        const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON.trim();
-        const jsonString = rawJson.startsWith('{')
-          ? rawJson
-          : Buffer.from(rawJson, 'base64').toString('utf8');
-        const serviceAccount = JSON.parse(jsonString);
-        const app = initializeApp({
-          credential: cert(serviceAccount),
-          storageBucket: env.firebase.storageBucket || `${serviceAccount.project_id}.firebasestorage.app`,
-        });
-        console.log('✓ Firebase Admin initialized with FIREBASE_SERVICE_ACCOUNT_JSON environment variable');
-        return app;
-      } catch (jsonErr) {
-        console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', jsonErr.message);
       }
     }
 
