@@ -166,7 +166,7 @@ export async function getFileById(uid, vaultId, assetId, fileId) {
 export async function downloadFile(uid, vaultId, assetId, fileId) {
   const { fileData } = await verifyFileOwnership(uid, vaultId, assetId, fileId);
 
-  // Check local filesystem first if local fallback was used
+  // Check local filesystem first
   const localUploadDir = resolve(process.cwd(), 'uploads', 'users', uid, 'assets', assetId);
   const localFilePath = resolve(localUploadDir, `${fileId}_${fileData.sanitizedName}`);
 
@@ -179,12 +179,32 @@ export async function downloadFile(uid, vaultId, assetId, fileId) {
         contentType: fileData.contentType,
       };
     }
+    const err = new Error('This file was uploaded prior to local storage initialization and is no longer available. Please delete and re-upload the file.');
+    err.status = 404;
+    throw err;
   }
 
-  // Otherwise, use Firebase Storage signed URL
+  // Otherwise, try Firebase Storage signed URL
   try {
     const bucket = getBucket();
     const storageFileRef = bucket.file(fileData.storagePath);
+
+    // Verify storage file exists before generating signed URL
+    const [exists] = await storageFileRef.exists().catch(() => [false]);
+    if (!exists) {
+      if (existsSync(localFilePath)) {
+        return {
+          isLocal: true,
+          localFilePath,
+          filename: fileData.originalName,
+          contentType: fileData.contentType,
+        };
+      }
+      const err = new Error('The requested file does not exist in cloud storage. Please delete and re-upload the file.');
+      err.status = 404;
+      throw err;
+    }
+
     const [url] = await storageFileRef.getSignedUrl({
       action: 'read',
       expires: Date.now() + 5 * 60 * 1000,
@@ -196,6 +216,7 @@ export async function downloadFile(uid, vaultId, assetId, fileId) {
       contentType: fileData.contentType,
     };
   } catch (err) {
+    if (err.status) throw err;
     if (existsSync(localFilePath)) {
       return {
         isLocal: true,
@@ -204,7 +225,9 @@ export async function downloadFile(uid, vaultId, assetId, fileId) {
         contentType: fileData.contentType,
       };
     }
-    throw err;
+    const notFoundErr = new Error('Storage file unavailable. Please re-upload this file.');
+    notFoundErr.status = 404;
+    throw notFoundErr;
   }
 }
 
