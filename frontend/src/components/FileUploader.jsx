@@ -8,13 +8,27 @@ const DANGEROUS_EXTENSIONS = [
   'vbs', 'pif', 'cpl', 'wsf', 'jar', 'gadget', 'py', 'ps1'
 ];
 
-export default function FileUploader({ assetId, onUploadSuccess, currentFilesCount = 0, maxFilesLimit = 50 }) {
+export default function FileUploader({ 
+  assetId, 
+  onUploadSuccess, 
+  onStagedChange,
+  currentFilesCount = 0, 
+  maxFilesLimit = 50,
+  autoUpload = true
+}) {
   const [stagedFiles, setStagedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({});
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
+
+  const updateStagedFiles = (newStaged) => {
+    setStagedFiles(newStaged);
+    if (onStagedChange) {
+      onStagedChange(newStaged);
+    }
+  };
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -85,17 +99,19 @@ export default function FileUploader({ assetId, onUploadSuccess, currentFilesCou
     }
 
     if (validated.length > 0) {
-      setStagedFiles(prev => [...prev, ...validated]);
+      const updated = [...stagedFiles, ...validated];
+      updateStagedFiles(updated);
     }
   };
 
   const removeStagedFile = (index) => {
-    setStagedFiles(prev => prev.filter((_, i) => i !== index));
+    const updated = stagedFiles.filter((_, i) => i !== index);
+    updateStagedFiles(updated);
     setError(null);
   };
 
   const handleUpload = async () => {
-    if (stagedFiles.length === 0) return;
+    if (stagedFiles.length === 0 || !assetId) return;
 
     setUploading(true);
     setError(null);
@@ -109,12 +125,11 @@ export default function FileUploader({ assetId, onUploadSuccess, currentFilesCou
     try {
       const res = await uploadAssetFiles(assetId, formData, (progressEvent) => {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-        // Direct object tracking for simplicity
         setProgress({ all: percentCompleted });
       });
 
       if (res.success) {
-        setStagedFiles([]);
+        updateStagedFiles([]);
         setProgress({});
         if (onUploadSuccess) {
           onUploadSuccess(res.data.files);
@@ -192,7 +207,7 @@ export default function FileUploader({ assetId, onUploadSuccess, currentFilesCou
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               Selected Files ({stagedFiles.length})
             </span>
-            {stagedFiles.length > 0 && !uploading && (
+            {stagedFiles.length > 0 && !uploading && assetId && autoUpload && (
               <button
                 onClick={handleUpload}
                 className="inline-flex items-center px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg transition-colors shadow-sm"

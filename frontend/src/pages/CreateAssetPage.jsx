@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createAsset } from '../services/vaultService';
+import { uploadAssetFiles } from '../services/fileService';
+import FileUploader from '../components/FileUploader';
 
 const CATEGORIES = [
   { id: 'important_documents', label: 'Important Documents' },
@@ -46,6 +48,9 @@ export default function CreateAssetPage() {
   // Tag input state
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState([]);
+
+  // Staged files state
+  const [stagedFiles, setStagedFiles] = useState([]);
 
   // Handlers for Tag Builder
   const handleAddTag = (e) => {
@@ -112,8 +117,18 @@ export default function CreateAssetPage() {
       };
 
       const res = await createAsset(payload);
-      if (res.success) {
-        navigate('/vault', { state: { info: 'Asset added to your Legacy Vault.' } });
+      if (res.success && res.data?.asset) {
+        const createdAsset = res.data.asset;
+        if (stagedFiles.length > 0) {
+          const formData = new FormData();
+          stagedFiles.forEach(f => formData.append('files', f));
+          await uploadAssetFiles(createdAsset.id, formData);
+        }
+        navigate('/vault', { 
+          state: { 
+            info: `Asset "${name}" added to your Legacy Vault${stagedFiles.length > 0 ? ` with ${stagedFiles.length} attached file(s)` : ''}.` 
+          } 
+        });
       } else {
         setErrors([res.message || 'Failed to create asset.']);
       }
@@ -304,6 +319,22 @@ export default function CreateAssetPage() {
             onChange={(e) => setNotes(e.target.value)}
             disabled={loading}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 placeholder-slate-400 resize-y"
+          />
+        </div>
+
+        {/* Attach File Section */}
+        <div>
+          <label className="block text-sm font-bold text-slate-800 mb-1.5 flex items-center justify-between">
+            <span>Attach Files <span className="text-xs font-semibold text-slate-400 font-normal">(Optional)</span></span>
+            {stagedFiles.length > 0 && (
+              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                {stagedFiles.length} file(s) selected
+              </span>
+            )}
+          </label>
+          <FileUploader
+            onStagedChange={setStagedFiles}
+            autoUpload={false}
           />
         </div>
 

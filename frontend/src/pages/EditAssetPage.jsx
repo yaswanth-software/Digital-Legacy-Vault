@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { getAssetById, updateAsset } from '../services/vaultService';
+import { getAssetFiles, deleteAssetFile } from '../services/fileService';
+import FileUploader from '../components/FileUploader';
+import FileCard from '../components/FileCard';
 
 const CATEGORIES = [
   { id: 'important_documents', label: 'Important Documents' },
@@ -46,19 +49,27 @@ export default function EditAssetPage() {
   const [priority, setPriority] = useState('medium');
   const [notes, setNotes] = useState('');
   
+  // Attached Files State
+  const [files, setFiles] = useState([]);
+  const [showUploader, setShowUploader] = useState(false);
+
   // Tag input state
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState([]);
 
-  // Fetch asset details
+  // Fetch asset details & files
   useEffect(() => {
     async function fetchAssetDetails() {
       try {
         setFetching(true);
         setErrors([]);
-        const res = await getAssetById(assetId);
-        if (res.success && res.data.asset) {
-          const a = res.data.asset;
+        const [assetRes, filesRes] = await Promise.all([
+          getAssetById(assetId),
+          getAssetFiles(assetId).catch(() => ({ success: false, data: { files: [] } })),
+        ]);
+
+        if (assetRes.success && assetRes.data.asset) {
+          const a = assetRes.data.asset;
           setName(a.name || '');
           setDescription(a.description || '');
           setCategory(a.category || '');
@@ -68,6 +79,10 @@ export default function EditAssetPage() {
           setTags(a.tags || []);
         } else {
           throw new Error('This asset could not be found.');
+        }
+
+        if (filesRes.success && filesRes.data?.files) {
+          setFiles(filesRes.data.files);
         }
       } catch (err) {
         console.error(err);
@@ -79,6 +94,26 @@ export default function EditAssetPage() {
     }
     fetchAssetDetails();
   }, [assetId]);
+
+  const handleDeleteFile = async (fileToDelete) => {
+    if (!window.confirm(`Are you sure you want to delete "${fileToDelete.originalName}"?`)) {
+      return;
+    }
+    try {
+      const res = await deleteAssetFile(assetId, fileToDelete.id);
+      if (res.success) {
+        setFiles(prev => prev.filter(f => f.id !== fileToDelete.id));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete file. Please try again.');
+    }
+  };
+
+  const handleUploadSuccess = (uploadedFiles) => {
+    setFiles(prev => [...prev, ...uploadedFiles]);
+    setShowUploader(false);
+  };
 
   // Handlers for Tag Builder
   const handleAddTag = (e) => {
@@ -372,6 +407,52 @@ export default function EditAssetPage() {
             disabled={saving}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 placeholder-slate-400 resize-y"
           />
+        </div>
+
+        {/* Attached Files Section */}
+        <div className="pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Attached Files</h3>
+              <p className="text-xs text-slate-500">Manage documents and files associated with this asset.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowUploader(!showUploader)}
+              className="inline-flex items-center justify-center px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-semibold text-xs rounded-xl border border-indigo-100 transition-colors shadow-sm"
+            >
+              {showUploader ? 'Cancel' : '+ Attach More Files'}
+            </button>
+          </div>
+
+          {showUploader && (
+            <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <FileUploader
+                assetId={assetId}
+                onUploadSuccess={handleUploadSuccess}
+                currentFilesCount={files.length}
+              />
+            </div>
+          )}
+
+          {/* List of existing files */}
+          {files.length > 0 ? (
+            <div className="space-y-2">
+              {files.map(file => (
+                <FileCard
+                  key={file.id}
+                  file={file}
+                  assetId={assetId}
+                  onDeleteClick={handleDeleteFile}
+                  onPreviewClick={() => {}}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+              <p className="text-xs text-slate-400 font-medium">No files attached to this asset yet.</p>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
